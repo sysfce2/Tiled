@@ -390,11 +390,7 @@ static void writeProperty(JsonWriter &json,
 static QStringList readTags(const Object *object)
 {
     const QString tags = optionalProperty(object, "tags", QString());
-#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
-    const QStringList tagList = tags.split(QLatin1Char(','), QString::SkipEmptyParts);
-#else
     const QStringList tagList = tags.split(QLatin1Char(','), Qt::SkipEmptyParts);
-#endif
     return tagList;
 }
 
@@ -1219,8 +1215,7 @@ static std::unique_ptr<GMRLayer> processImageLayer(const ImageLayer *imageLayer,
     gmrBackgroundLayer->animationSpeedType = optionalProperty(imageLayer, "animationSpeedType", gmrBackgroundLayer->animationSpeedType);
     gmrBackgroundLayer->userdefinedAnimFPS = imageLayer->resolvedProperty(QStringLiteral("animationFPS")).isValid();
 
-    // Workaround compilation issue with mingw49
-    return std::unique_ptr<GMRLayer>(std::move(gmrBackgroundLayer));
+    return gmrBackgroundLayer;
 }
 
 static void processLayers(std::vector<std::unique_ptr<GMRLayer>> &gmrLayers,

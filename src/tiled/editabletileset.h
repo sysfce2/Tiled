@@ -25,6 +25,7 @@
 
 namespace Tiled {
 
+class ChangeEvent;
 class EditableTile;
 class EditableWangSet;
 class ScriptImage;
@@ -60,6 +61,7 @@ class EditableTileset final : public EditableAsset
     Q_PROPERTY(bool collection READ isCollection)   // deprecated
     Q_PROPERTY(bool isCollection READ isCollection)
     Q_PROPERTY(QList<QObject*> selectedTiles READ selectedTiles WRITE setSelectedTiles)
+    Q_PROPERTY(Tileset::TransformationFlags transformationFlags READ transformationFlags WRITE setTransformationFlags)
 
 public:
     // Synchronized with Tiled::Alignment
@@ -98,6 +100,16 @@ public:
     };
     Q_ENUM(FillMode)
 
+    // Synchronized with Tileset::TransformationFlag
+    enum TransformationFlag {
+        NoTransformation        = 0,
+        AllowFlipHorizontally   = 1 << 0,
+        AllowFlipVertically     = 1 << 1,
+        AllowRotate             = 1 << 2,
+        PreferUntransformed     = 1 << 3,
+    };
+    Q_ENUM(TransformationFlag)
+
     Q_INVOKABLE explicit EditableTileset(const QString &name = QString(),
                                          QObject *parent = nullptr);
     explicit EditableTileset(const Tileset *tileset, QObject *parent = nullptr);
@@ -129,6 +141,7 @@ public:
     QColor transparentColor() const;
     QColor backgroundColor() const;
     bool isCollection() const;
+    Tileset::TransformationFlags transformationFlags() const;
 
     Q_INVOKABLE void loadFromImage(Tiled::ScriptImage *image,
                                    const QString &source = QString());
@@ -172,6 +185,7 @@ public slots:
     void setOrientation(Orientation orientation);
     void setTransparentColor(const QColor &color);
     void setBackgroundColor(const QColor &color);
+    void setTransformationFlags(Tileset::TransformationFlags flags);
 
 protected:
     void setDocument(Document *document) override;
@@ -179,6 +193,7 @@ protected:
 private:
     bool tilesFromEditables(const QList<QObject*> &editableTiles, QList<Tile *> &tiles);
 
+    void documentChanged(const ChangeEvent &event);
     void attachTiles(const QList<Tile*> &tiles);
     void detachTiles(const QList<Tile*> &tiles);
     void detachWangSets(const QList<WangSet*> &wangSets);
@@ -303,6 +318,11 @@ inline bool EditableTileset::isCollection() const
     return tileset()->isCollection();
 }
 
+inline Tileset::TransformationFlags EditableTileset::transformationFlags() const
+{
+    return tileset()->transformationFlags();
+}
+
 inline Tileset *EditableTileset::tileset() const
 {
     return static_cast<Tileset*>(object());
@@ -329,5 +349,3 @@ inline void EditableTileset::setTileSize(int width, int height)
 }
 
 } // namespace Tiled
-
-Q_DECLARE_METATYPE(Tiled::EditableTileset*)
