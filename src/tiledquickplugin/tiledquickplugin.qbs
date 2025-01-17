@@ -6,7 +6,7 @@ DynamicLibrary {
     Depends { name: "libtiledquick" }
     Depends {
         name: "Qt"; submodules: ["qml", "quick"]
-        versionAtLeast: "5.12"
+        versionAtLeast: "5.15"
     }
 
     cpp.cxxLanguageVersion: "c++17"
@@ -19,7 +19,7 @@ DynamicLibrary {
         return flags;
     }
     cpp.defines: [
-        "QT_DISABLE_DEPRECATED_BEFORE=QT_VERSION_CHECK(5,15,0)",
+        "QT_DISABLE_DEPRECATED_BEFORE=0x050F00",
         "QT_NO_DEPRECATED_WARNINGS",
         "QT_NO_CAST_FROM_ASCII",
         "QT_NO_CAST_TO_ASCII",

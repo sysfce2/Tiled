@@ -49,12 +49,6 @@ class TILEDSHARED_EXPORT PropertyValue
     Q_PROPERTY(QString typeName READ typeName)
 
 public:
-    // needed to work around compilation issue with mingw49
-    PropertyValue(const QVariant &value = QVariant(), int typeId = 0)
-        : value(value)
-        , typeId(typeId)
-    {}
-
     QVariant value;
     int typeId;
 
@@ -195,6 +189,3 @@ TILEDSHARED_EXPORT QString typeName(const QVariant &value);
 TILEDSHARED_EXPORT void initializeMetatypes();
 
 } // namespace Tiled
-
-Q_DECLARE_METATYPE(Tiled::FilePath)
-Q_DECLARE_METATYPE(Tiled::ObjectRef)
