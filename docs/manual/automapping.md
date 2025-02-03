@@ -113,8 +113,8 @@ Everything after the first underscore is the **name**, which determines which la
 
 The **index** is optional, and is not related to the input indices. Instead, output indices are used to randomize the output: every time the rule finds a match, a random output index is chosen and only the output layers with that index will have their contents placed into the working map.
 
-{bdg-primary}`New in Tiled 1.10.3`
-For convenience, Tiled 1.10.3 introduced two changes to the behavior related to indexes. If an output index is completely empty for a given rule, it will never be chosen for that rule. This is useful when some rules have more random options than others. Also, when no index is specified, that part of the rule's output will always apply when the rule matches. This can be used to combine an unconditional part of a rule's output with a random part.
+{bdg-primary}`New in Tiled 1.11`
+For convenience, Tiled 1.11 introduced two changes to the behavior related to indexes. If an output index is completely empty for a given rule, it will never be chosen for that rule. This is useful when some rules have more random options than others. Also, when no index is specified, that part of the rule's output will always apply when the rule matches. This can be used to combine an unconditional part of a rule's output with a random part.
 
 #### Random Output Example
 
@@ -172,12 +172,12 @@ The behavior of your rules can be modified by properties on the rules map, input
 
 (DeleteTiles)=
 DeleteTiles
-: This is a boolean map property: it can be `true` or `false`. When `true`, if rules of this rule map get applied at some location in your map, all existing tiles in the input region are deleted before applying the output. The usual way to erase tiles via Automapping is to output the [Empty]{.tile .empty} [special tile](#specialtiles), but this property can save you time your rules do a lot of deletions on certain layers.
+: This is a boolean map property. When this property is `true`, the area covered by tiles in input layers is erased from the output layers before applying the rules. This property is mostly provided for backwards compatibility, because since Tiled 1.9 tiles can be erased by outputting the [Empty]{.tile .empty} [special tile](#specialtiles), which is more explicit and more flexible.
 
-  Despite the name, this property affects output Object Layers too, deleting any Objects that fully or partially overlap the input region of any rule that matches. This is currently the only way to delete Objects via Automapping.
+  Despite the name, this property affects output Object Layers too, deleting any Objects that fully or partially overlap the erased region. This is currently the only way to delete Objects via Automapping.
 
   :::{warning}
-  Objects are only deleted when they overlap tiles in the input region. All the caveats of outputting objects also apply, see the [warning in the Defining Outputs section](#objectRegion).
+  All the caveats of outputting objects also apply when deleting them, see the [warning in the Defining Outputs section](#objectRegion).
   :::
 
 (AutomappingRadius)=
@@ -217,7 +217,7 @@ AutoEmpty (alias: StrictEmpty)
 
   Normally, empty tiles are simply ignored. When **AutoEmpty** is `true`, empty tiles within the input region match empty tiles in the target layer. This can only happen when you have multiple input/inputnot layers and some of the tiles that are part of the same rule are empty while others are not. Usually, using the [Empty]{.tile .empty} [special tile](#specialtiles) is the best way to specify an empty tile, but this property is useful when you have multiple input layers, some of which need to match many empty tiles. Note that the input region is defined by *all* input layers, regardless of index.
 
-IgnoreHorizontalFlip {bdg-primary}`New in Tiled 1.10.3`
+IgnoreHorizontalFlip {bdg-primary}`New in Tiled 1.11`
 : This boolean layer property can be added to `input` and `inputnot` layers to also match horizontally flipped versions of the input tile.
 
 IgnoreVerticalFlip
@@ -410,10 +410,8 @@ In Tiled 1.9.x, the presence of `regions` layers did not imply **MatchInOrder**.
 
 If you'd like to instead update your rules to not rely on any legacy behavior, that can be as simple as deleting your `regions` layer(s), or it might take some extra work, depending on how exactly your rules are set up:
 
-* If your rules rely on being applied in a set order, set the [**MatchInOrder**](#MatchInOrder) map property to `true`.
+* If your rules need to take the output of other rules in the same rules map into account, set the [**MatchInOrder**](#MatchInOrder) map property to `true`.
 * When deleting your `regions` layers, make sure you weren't relying on them to connect otherwise disconnected areas of tiles. If you were, use the [Ignore]{.tile .ignore} [special tile](#specialtiles) to connect them on one of the `input` layers, so that Tiled knows they're part of the same rule. To make sure the rules behave exactly the same, fill in any part that was previously part of the input region.
-
-* If were using the [**DeleteTiles**](#DeleteTiles) map property to erase tiles from the output layer, you can keep using this property. If you want to make your rule more visually clear, however, you should unset the **DeleteTiles** property, and instead use the [Empty]{.tile .empty} [special tile](#specialtiles) in all the output cells you want to delete from.
 
 * If were using the [**StrictEmpty**](#AutoEmpty) map property to look for empty input tiles, you should now use the Empty special tile instead in the cells you want to check for being empty. You can also continue use the **StrictEmpty** property (or its newer alias, **AutoEmpty**), as long as at least one other input layer is not empty at those locations.
 

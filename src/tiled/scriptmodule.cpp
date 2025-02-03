@@ -35,10 +35,10 @@
 #include "scriptedfileformat.h"
 #include "scriptedtool.h"
 #include "scriptfileformatwrappers.h"
+#include "scriptimage.h"
 #include "scriptmanager.h"
 #include "tilesetdocument.h"
 #include "tileseteditor.h"
-#include "world.h"
 #include "worlddocument.h"
 #include "worldmanager.h"
 
@@ -62,6 +62,7 @@ ScriptModule::ScriptModule(QObject *parent)
     if (auto documentManager = DocumentManager::maybeInstance()) {
         connect(documentManager, &DocumentManager::documentCreated, this, &ScriptModule::documentCreated);
         connect(documentManager, &DocumentManager::documentOpened, this, &ScriptModule::documentOpened);
+        connect(documentManager, &DocumentManager::documentReloaded, this, &ScriptModule::documentReloaded);
         connect(documentManager, &DocumentManager::documentAboutToBeSaved, this, &ScriptModule::documentAboutToBeSaved);
         connect(documentManager, &DocumentManager::documentSaved, this, &ScriptModule::documentSaved);
         connect(documentManager, &DocumentManager::documentAboutToClose, this, &ScriptModule::documentAboutToClose);
@@ -73,8 +74,8 @@ ScriptModule::ScriptModule(QObject *parent)
 
 ScriptModule::~ScriptModule()
 {
-    for (const auto &pair : mRegisteredActions)
-        ActionManager::unregisterAction(pair.second.get(), pair.first);
+    for (const auto &[id, action] : mRegisteredActions)
+        ActionManager::unregisterAction(action.get(), id);
 
     ActionManager::clearMenuExtensions();
 
@@ -239,6 +240,20 @@ MapEditor *ScriptModule::mapEditor() const
     return nullptr;
 }
 
+QColor ScriptModule::color(const QString &name) const
+{
+#if QT_VERSION < QT_VERSION_CHECK(6, 4, 0)
+    return QColor::isValidColor(name) ? QColor(name) : QColor();
+#else
+    return QColor::fromString(name);
+#endif
+}
+
+QColor ScriptModule::color(float r, float g, float b, float a) const
+{
+    return QColor::fromRgbF(r, g, b, a);
+}
+
 FilePath ScriptModule::filePath(const QUrl &path) const
 {
     return { path };
@@ -249,7 +264,7 @@ ObjectRef ScriptModule::objectRef(int id) const
     return { id };
 }
 
-QVariant ScriptModule::propertyValue(const QString &typeName, const QVariant &value) const
+QVariant ScriptModule::propertyValue(const QString &typeName, const QJSValue &value) const
 {
     auto type = Object::propertyTypes().findPropertyValueType(typeName);
     if (!type) {
@@ -257,16 +272,37 @@ QVariant ScriptModule::propertyValue(const QString &typeName, const QVariant &va
         return {};
     }
 
+    const QVariant var = value.toVariant();
+
     switch (type->type) {
     case PropertyType::PT_Invalid:
     case PropertyType::PT_Class:
+        if (var.userType() != QVariant::Map) {
+            ScriptManager::instance().throwError(QCoreApplication::translate("Script Errors", "Expected object to initialize class value"));
+            return {};
+        }
         break;
     case PropertyType::PT_Enum:
         // Call toPropertyValue to support using strings to create a value
-        return type->toPropertyValue(value, ExportContext());
+        return type->toPropertyValue(var, ExportContext());
     }
 
-    return type->wrap(value);
+    return type->wrap(var);
+}
+
+QCursor ScriptModule::cursor(Qt::CursorShape shape)
+{
+    return shape;
+}
+
+QCursor ScriptModule::cursor(ScriptImage *image, int hotX, int hotY)
+{
+    if (!image) {
+        ScriptManager::instance().throwNullArgError(0);
+        return {};
+    }
+
+    return QCursor { QPixmap::fromImage(image->image()), hotX, hotY };
 }
 
 bool ScriptModule::versionLessThan(const QString &a, const QString &b)
@@ -676,6 +712,11 @@ void ScriptModule::documentOpened(Document *document)
     emit assetOpened(document->editable());
 }
 
+void ScriptModule::documentReloaded(Document *document)
+{
+    emit assetReloaded(document->editable());
+}
+
 void ScriptModule::documentAboutToBeSaved(Document *document)
 {
     emit assetAboutToBeSaved(document->editable());
@@ -704,10 +745,8 @@ QList<QObject *> ScriptModule::worlds() const
     if (!documentManager)
         return worlds;
 
-    for (const World *world : WorldManager::instance().worlds()) {
-        WorldDocument *worldDocument = documentManager->ensureWorldDocument(world->fileName);
+    for (auto &worldDocument : WorldManager::instance().worlds())
         worlds.append(worldDocument->editable());
-    }
 
     return worlds;
 }
@@ -719,7 +758,8 @@ void ScriptModule::loadWorld(const QString &fileName) const
 
 void ScriptModule::unloadWorld(const QString &fileName) const
 {
-    WorldManager::instance().unloadWorld(fileName);
+    if (auto worldDocument = WorldManager::instance().findWorld(fileName))
+        WorldManager::instance().unloadWorld(worldDocument);
 }
 
 void ScriptModule::unloadAllWorlds() const

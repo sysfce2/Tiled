@@ -102,8 +102,6 @@ void MapScene::setMapDocument(MapDocument *mapDocument)
     if (mMapDocument) {
         connect(mMapDocument, &MapDocument::changed,
                 this, &MapScene::changeEvent);
-        connect(mMapDocument, &MapDocument::mapChanged,
-                this, &MapScene::mapChanged);
         connect(mMapDocument, &MapDocument::tilesetTilePositioningChanged,
                 this, [this] { update(); });
         connect(mMapDocument, &MapDocument::tileImageSourceChanged,
@@ -258,9 +256,20 @@ QPointF MapScene::parallaxOffset(const Layer &layer) const
 
     QPointF viewCenter = mViewRect.center();
 
-    Map *map = layer.map();
-    if (const MapItem *mapItem = mMapItems.value(map))
-        viewCenter -= mapItem->pos() + map->parallaxOrigin();
+    if (Map *map = layer.map()) {
+        viewCenter += map->parallaxOrigin();
+
+        const MapItem *mapItem = nullptr;
+        for (auto it = mMapItems.begin(); it != mMapItems.end(); ++it) {
+            if (it.key()->map() == map) {
+                mapItem = it.value();
+                break;
+            }
+        }
+
+        if (mapItem)
+            viewCenter -= mapItem->pos();
+    }
 
     const QPointF parallaxFactor = layer.effectiveParallaxFactor();
     return QPointF((1.0 - parallaxFactor.x()) * viewCenter.x(),
@@ -272,7 +281,7 @@ QPointF MapScene::parallaxOffset(const Layer &layer) const
  */
 void MapScene::refreshScene()
 {
-    QHash<Map*, MapItem*> mapItems;
+    QHash<MapDocument*, MapItem*> mapItems;
 
     if (!mMapDocument) {
         mMapItems.swap(mapItems);
@@ -282,9 +291,10 @@ void MapScene::refreshScene()
     }
 
     const WorldManager &worldManager = WorldManager::instance();
-    const QString currentMapFile = mMapDocument->canonicalFilePath();
+    const QString &currentMapFile = mMapDocument->fileName();
 
-    if (const World *world = worldManager.worldForMap(currentMapFile)) {
+    if (auto worldDocument = worldManager.worldForMap(currentMapFile)) {
+        const auto world = worldDocument->world();
         const QPoint currentMapPosition = world->mapRect(currentMapFile).topLeft();
         auto const contextMaps = world->contextMaps(currentMapFile);
 
@@ -306,12 +316,12 @@ void MapScene::refreshScene()
                 auto mapItem = takeOrCreateMapItem(mapDocument, displayMode);
                 mapItem->setPos(mapEntry.rect.topLeft() - currentMapPosition);
                 mapItem->setVisible(mWorldsEnabled || mapDocument == mMapDocument);
-                mapItems.insert(mapDocument->map(), mapItem);
+                mapItems.insert(mapDocument.data(), mapItem);
             }
         }
     } else {
         auto mapItem = takeOrCreateMapItem(mMapDocument->sharedFromThis(), MapItem::Editable);
-        mapItems.insert(mMapDocument->map(), mapItem);
+        mapItems.insert(mMapDocument, mapItem);
     }
 
     mMapItems.swap(mapItems);
@@ -377,7 +387,7 @@ void MapScene::setWorldsEnabled(bool enabled)
 MapItem *MapScene::takeOrCreateMapItem(const MapDocumentPtr &mapDocument, MapItem::DisplayMode displayMode)
 {
     // Try to reuse an existing map item
-    auto mapItem = mMapItems.take(mapDocument->map());
+    auto mapItem = mMapItems.take(mapDocument.data());
     if (!mapItem) {
         mapItem = new MapItem(mapDocument, displayMode);
         mapItem->setShowTileCollisionShapes(mShowTileCollisionShapes);
@@ -393,10 +403,19 @@ MapItem *MapScene::takeOrCreateMapItem(const MapDocumentPtr &mapDocument, MapIte
 void MapScene::changeEvent(const ChangeEvent &change)
 {
     switch (change.type) {
-    case ChangeEvent::MapChanged:
-        if (static_cast<const MapChangeEvent&>(change).property == Map::ParallaxOriginProperty)
+    case ChangeEvent::MapChanged: {
+        switch (static_cast<const MapChangeEvent&>(change).property) {
+        case Map::ParallaxOriginProperty:
             emit parallaxParametersChanged();
+            break;
+        case Map::BackgroundColorProperty:
+            updateBackgroundColor();
+            break;
+        default:
+            break;
+        }
         break;
+    }
     case ChangeEvent::TilesetChanged:{
         auto &tilesetChange = static_cast<const TilesetChangeEvent&>(change);
         switch (tilesetChange.property) {
@@ -410,14 +429,6 @@ void MapScene::changeEvent(const ChangeEvent &change)
     default:
         break;
     }
-}
-
-/**
- * Updates the possibly changed background color.
- */
-void MapScene::mapChanged()
-{
-    updateBackgroundColor();
 }
 
 void MapScene::repaintTileset(Tileset *tileset)

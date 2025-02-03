@@ -72,6 +72,8 @@ public:
     const QString &className() const;
     void setClassName(const QString &className);
 
+    const ClassPropertyType *classType() const;
+
     /**
      * Returns the properties of this object.
      */
@@ -111,6 +113,7 @@ public:
 
     QVariant resolvedProperty(const QString &name) const;
     QVariantMap resolvedProperties() const;
+    QVariantMap inheritedProperties() const;
 
     /**
      * Returns the value of the object's \a name property, as a string.
@@ -138,6 +141,18 @@ public:
      */
     void setProperty(const QString &name, const QVariant &value)
     { mProperties.insert(name, value); }
+
+    /**
+     * Sets the value of an object's property identified the given \a path
+     * to \a value.
+     *
+     * The \a path is a list of property names, where each name identifies
+     * a member of the previous member's value. The last name in the list
+     * identifies the property to set.
+     *
+     * Returns whether the property was set.
+     */
+    bool setProperty(const QStringList &path, const QVariant &value);
 
     /**
      * Removes the property with the given \a name.

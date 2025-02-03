@@ -321,7 +321,7 @@ unsigned WangId::toUint() const
     return id;
 }
 
-WangId WangId::fromString(QStringRef string, bool *ok)
+WangId WangId::fromString(QStringView string, bool *ok)
 {
     WangId id;
 
@@ -416,6 +416,12 @@ WangSet::WangSet(Tileset *tileset,
     , mImageTileId(imageTileId)
 {
     setType(type);
+}
+
+WangSet::~WangSet()
+{
+    for (auto &color : std::as_const(mColors))
+        color->mWangSet = nullptr;
 }
 
 /**
